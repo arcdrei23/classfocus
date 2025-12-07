@@ -1,30 +1,31 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:trial/main.dart';
+// Import your app files
+import 'package:trial/screens/student/dashboard/tabs/home_dashboard_tab.dart'; 
+import 'package:trial/theme/app_theme.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('HomeDashboardTab loads correctly', (WidgetTester tester) async {
+    // 1. Wrap the widget in MaterialApp
+    // We also provide the Theme so colors render correctly in the test environment
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: const HomeDashboardTab(),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // 2. Allow animations to settle (helper for image loading issues)
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // 3. Verify the "Subjects" section exists
+    expect(find.text('Subjects'), findsOneWidget);
 
-    // Verify that our counter has incremented.
+    // 4. Verify the "Recent Activity" section exists
+    expect(find.text('Recent Activity'), findsOneWidget);
+
+    // 5. Verify that the old counter text "0" does NOT exist
     expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
   });
 }
