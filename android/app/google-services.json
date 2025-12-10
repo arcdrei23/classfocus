@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "393288360776",
+    "project_id": "classfocus-app",
+    "storage_bucket": "classfocus-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:393288360776:android:d0db1f9c1a105fd2fb097d",
+        "android_client_info": {
+          "package_name": "com.example.classfocus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCy_sWsavwbgHNqjb200EpwgaOeZDf2kfA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:393288360776:android:689c16963fc08a5dfb097d",
+        "android_client_info": {
+          "package_name": "com.example.trial"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCy_sWsavwbgHNqjb200EpwgaOeZDf2kfA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
