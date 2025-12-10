@@ -3,8 +3,40 @@ import 'package:flutter/material.dart';
 import '../../../../theme/app_theme.dart';
 import '../../messages/chat_screen.dart';
 
-class MessagesTab extends StatelessWidget {
+class MessagesTab extends StatefulWidget {
   MessagesTab({super.key});
+
+  @override
+  State<MessagesTab> createState() => _MessagesTabState();
+}
+
+class _MessagesTabState extends State<MessagesTab> {
+  final List<ChatItem> _chats = [
+    ChatItem(
+      name: 'Dr. Smith',
+      lastMessage: 'Your quiz results are ready for review.',
+      timestamp: '2m ago',
+      hasUnread: true,
+    ),
+    ChatItem(
+      name: 'Prof. Johnson',
+      lastMessage: 'Great work on the Data Structures assignment!',
+      timestamp: '1h ago',
+      hasUnread: false,
+    ),
+    ChatItem(
+      name: 'TA Maria',
+      lastMessage: 'Office hours are tomorrow at 2 PM.',
+      timestamp: '3h ago',
+      hasUnread: false,
+    ),
+    ChatItem(
+      name: 'Study Group',
+      lastMessage: 'Meeting at the library at 4 PM',
+      timestamp: '5h ago',
+      hasUnread: true,
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -16,21 +48,66 @@ class MessagesTab extends StatelessWidget {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_comment),
-            onPressed: () {
-              // TODO: Implement new chat functionality
-            },
-            tooltip: 'New Chat',
+            icon: const Icon(Icons.person_add_alt),
+            onPressed: _showAddUserDialog,
           ),
         ],
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _mockChats.length,
+        itemCount: _chats.length,
         itemBuilder: (context, index) {
-          final chat = _mockChats[index];
+          final chat = _chats[index];
           return _buildChatItem(context, chat);
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppTheme.primaryBlue,
+        onPressed: _showAddUserDialog,
+        child: const Icon(Icons.add_comment, color: Colors.white),
+      ),
+    );
+  }
+
+  void _showAddUserDialog() {
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start new chat'),
+        content: TextField(
+          controller: nameCtrl,
+          decoration: const InputDecoration(
+            labelText: 'User name',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              setState(() {
+                _chats.insert(
+                  0,
+                  ChatItem(
+                    name: nameCtrl.text.trim(),
+                    lastMessage: 'New chat started',
+                    timestamp: 'Just now',
+                    hasUnread: true,
+                  ),
+                );
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Chat created')),
+              );
+            },
+            child: const Text('Add'),
+          ),
+        ],
       ),
     );
   }
@@ -146,33 +223,6 @@ class MessagesTab extends StatelessWidget {
     );
   }
 
-  // Mock chat data
-  final List<ChatItem> _mockChats = [
-    ChatItem(
-      name: 'Dr. Smith',
-      lastMessage: 'Your quiz results are ready for review.',
-      timestamp: '2m ago',
-      hasUnread: true,
-    ),
-    ChatItem(
-      name: 'Prof. Johnson',
-      lastMessage: 'Great work on the Data Structures assignment!',
-      timestamp: '1h ago',
-      hasUnread: false,
-    ),
-    ChatItem(
-      name: 'TA Maria',
-      lastMessage: 'Office hours are tomorrow at 2 PM.',
-      timestamp: '3h ago',
-      hasUnread: false,
-    ),
-    ChatItem(
-      name: 'Study Group',
-      lastMessage: 'Meeting at the library at 4 PM',
-      timestamp: '5h ago',
-      hasUnread: true,
-    ),
-  ];
 }
 
 class ChatItem {

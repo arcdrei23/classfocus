@@ -1,7 +1,7 @@
 // lib/screens/student/dashboard/tabs/timer_tab.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../../../../theme/app_theme.dart';
+import 'package:flutter/services.dart';
 
 class TimerTab extends StatefulWidget {
   const TimerTab({super.key});
@@ -10,12 +10,13 @@ class TimerTab extends StatefulWidget {
   State<TimerTab> createState() => _TimerTabState();
 }
 
-class _TimerTabState extends State<TimerTab> {
+class _TimerTabState extends State<TimerTab> with WidgetsBindingObserver {
   Timer? _timer;
   int _totalSeconds = 25 * 60; // 25 minutes in seconds
   int _remainingSeconds = 25 * 60;
   bool _isRunning = false;
   String _currentMode = 'pomodoro'; // 'pomodoro', 'short break', 'long break'
+  bool _wasInterrupted = false;
 
   // Mode durations in seconds
   final Map<String, int> _modeDurations = {
@@ -27,14 +28,35 @@ class _TimerTabState extends State<TimerTab> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _remainingSeconds = _modeDurations[_currentMode]!;
     _totalSeconds = _modeDurations[_currentMode]!;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if ((_isRunning) &&
+        (state == AppLifecycleState.inactive ||
+            state == AppLifecycleState.paused)) {
+      _pauseTimer();
+      _wasInterrupted = true;
+      SystemSound.play(SystemSoundType.alert);
+    } else if (_wasInterrupted && state == AppLifecycleState.resumed) {
+      _wasInterrupted = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Timer paused due to switching apps'),
+        ),
+      );
+    }
+    super.didChangeAppLifecycleState(state);
   }
 
   void _startTimer() {
@@ -47,7 +69,10 @@ class _TimerTabState extends State<TimerTab> {
           setState(() => _remainingSeconds--);
         } else {
           _pauseTimer();
-          // Timer completed - could show notification here
+          SystemSound.play(SystemSoundType.alert);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Time is up!')),
+          );
         }
       });
     }
@@ -56,14 +81,6 @@ class _TimerTabState extends State<TimerTab> {
   void _pauseTimer() {
     setState(() => _isRunning = false);
     _timer?.cancel();
-  }
-
-  void _resetTimer() {
-    _pauseTimer();
-    setState(() {
-      _remainingSeconds = _modeDurations[_currentMode]!;
-      _totalSeconds = _modeDurations[_currentMode]!;
-    });
   }
 
   void _switchMode(String mode) {

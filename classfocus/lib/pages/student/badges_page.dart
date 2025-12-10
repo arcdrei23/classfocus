@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../data/dummy_badges.dart';
 import '../../../models/badge.dart' as models;
+import '../../../services/auth_service.dart';
 
 class BadgesPage extends StatefulWidget {
   const BadgesPage({super.key});
@@ -11,8 +13,6 @@ class BadgesPage extends StatefulWidget {
 
 class _BadgesPageState extends State<BadgesPage>
     with SingleTickerProviderStateMixin {
-  int totalXP = 520;         // You can replace with backend values
-  int streak = 7;            // You can replace with backend values
   late AnimationController bounceController;
 
   @override
@@ -25,8 +25,13 @@ class _BadgesPageState extends State<BadgesPage>
       lowerBound: 0.85,
       upperBound: 1.0,
     )..repeat(reverse: true);
-
-    _checkUnlocks();
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final authService = Provider.of<AuthService>(context, listen: false);
+    _checkUnlocks(authService);
   }
 
   @override
@@ -36,7 +41,13 @@ class _BadgesPageState extends State<BadgesPage>
   }
 
   /// Unlock badges based on XP and streak
-  void _checkUnlocks() {
+  void _checkUnlocks(AuthService authService) {
+    final user = authService.currentUser;
+    if (user == null) return;
+    
+    final totalXP = user.xp;
+    final streak = user.streak;
+    
     for (var badge in dummyBadges) {
       if (totalXP >= badge.requiredXP &&
           streak >= badge.requiredStreak &&
@@ -48,26 +59,35 @@ class _BadgesPageState extends State<BadgesPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xff0f0f1c),
-      appBar: AppBar(
-        title: const Text("Badges"),
-        foregroundColor: Colors.white,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: GridView.builder(
-          itemCount: dummyBadges.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        // Check unlocks when user data is available
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkUnlocks(authService);
+        });
+
+        return Scaffold(
+          backgroundColor: const Color(0xff0f0f1c),
+          appBar: AppBar(
+            title: const Text("Badges"),
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
           ),
-          itemBuilder: (_, i) => _buildBadge(dummyBadges[i]),
-        ),
-      ),
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: GridView.builder(
+              itemCount: dummyBadges.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemBuilder: (_, i) => _buildBadge(dummyBadges[i]),
+            ),
+          ),
+        );
+      },
     );
   }
 

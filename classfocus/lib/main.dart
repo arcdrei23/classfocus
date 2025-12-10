@@ -5,8 +5,20 @@ import 'routes.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/quiz_provider.dart';
+import 'services/firebase_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  try {
+    await FirebaseService.initialize();
+  } catch (e) {
+    print('Firebase initialization error: $e');
+    // App will still run, but Firebase features won't work
+    // Make sure to add google-services.json (Android) and GoogleService-Info.plist (iOS)
+  }
+  
   runApp(const ClassFocusApp());
 }
 

@@ -10,8 +10,10 @@ class AuthService extends ChangeNotifier {
     UserModel(
       id: '1',
       name: 'John Doe',
+      email: 'john.doe@student.school.edu',
       studentId: 'ID 12345',
       xp: 850,
+      streak: 7,
       profileImageUrl: 'assets/images/logo.png',
       recentActivities: [
         ActivityItem(
@@ -31,8 +33,10 @@ class AuthService extends ChangeNotifier {
     UserModel(
       id: '2',
       name: 'Student A',
+      email: 'student.a@school.edu',
       studentId: 'ID 67890',
       xp: 1200,
+      streak: 5,
       profileImageUrl: 'assets/images/logo.png',
       recentActivities: [
         ActivityItem(
@@ -52,8 +56,10 @@ class AuthService extends ChangeNotifier {
     UserModel(
       id: '3',
       name: 'Student B',
+      email: 'student.b@school.edu',
       studentId: 'ID 11111',
       xp: 450,
+      streak: 3,
       profileImageUrl: 'assets/images/logo.png',
       recentActivities: [
         ActivityItem(

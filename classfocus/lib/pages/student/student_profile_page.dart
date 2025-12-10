@@ -24,7 +24,9 @@ class StudentProfilePage extends StatelessWidget {
               tag: "avatar_${student.id}",
               child: CircleAvatar(
                 radius: 60,
-                backgroundImage: AssetImage(student.avatarUrl),
+                backgroundImage: student.avatarUrl.startsWith('http')
+                    ? NetworkImage(student.avatarUrl) as ImageProvider
+                    : AssetImage(student.avatarUrl),
               ),
             ),
             const SizedBox(height: 20),

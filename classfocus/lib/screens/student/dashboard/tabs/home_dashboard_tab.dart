@@ -1,37 +1,49 @@
 // lib/screens/student/dashboard/tabs/home_dashboard_tab.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // <--- Added
 import '../../../../theme/app_theme.dart';
+import '../../../../services/auth_service.dart'; // <--- Added
 
 class HomeDashboardTab extends StatelessWidget {
   const HomeDashboardTab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.background, 
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildUserHeader(),
-              const SizedBox(height: 24),
-              _buildBannerCard(context),
-              const SizedBox(height: 24),
-              _buildSearchBar(),
-              const SizedBox(height: 24),
-              _buildSubjectsSection(context),
-              const SizedBox(height: 24),
-              _buildRecentActivityList(),
-            ],
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        final user = authService.currentUser;
+
+        return Scaffold(
+          backgroundColor: AppTheme.background, 
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Pass the user data to the header
+                  _buildUserHeader(
+                    user?.name ?? "Student",
+                    user?.xp ?? 0,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildBannerCard(context),
+                  const SizedBox(height: 24),
+                  _buildSearchBar(),
+                  const SizedBox(height: 24),
+                  _buildSubjectsSection(context),
+                  const SizedBox(height: 24),
+                  _buildRecentActivityList(),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildUserHeader() {
+  Widget _buildUserHeader(String userName, int xp) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -43,7 +55,7 @@ class HomeDashboardTab extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: AppTheme.primaryBlue, width: 2),
               ),
-              // --- FIXED SECTION: Safe Image Loading ---
+              // --- KEPT YOUR SAFE IMAGE LOADING ---
               child: CircleAvatar(
                 radius: 24,
                 backgroundColor: AppTheme.surface,
@@ -54,29 +66,28 @@ class HomeDashboardTab extends StatelessWidget {
                     height: 48,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      // Show this icon if image is missing, preventing crash
                       return const Icon(Icons.person, color: Colors.white);
                     },
                   ),
                 ),
               ),
-              // ----------------------------------------
+              // -------------------------------------
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
+                const Text(
+                  "Welcome back,",
+                  style: TextStyle(fontSize: 14, color: AppTheme.secondaryText),
+                ),
                 Text(
-                  "Student Name", 
-                  style: TextStyle(
+                  userName, // <--- 4. DISPLAY DYNAMIC NAME HERE
+                  style: const TextStyle(
                     fontSize: 18, 
                     fontWeight: FontWeight.bold,
                     color: Colors.white 
-                  )
-                ),
-                Text(
-                  "Grade 6 - Einstein", 
-                  style: TextStyle(color: AppTheme.secondaryText, fontSize: 13)
+                  ),
                 ),
               ],
             ),
@@ -92,12 +103,12 @@ class HomeDashboardTab extends StatelessWidget {
             ],
           ),
           child: Row(
-            children: const [
-              Icon(Icons.star_rounded, color: Colors.orange, size: 22),
-              SizedBox(width: 6),
+            children: [
+              const Icon(Icons.star_rounded, color: Colors.orange, size: 22),
+              const SizedBox(width: 6),
               Text(
-                "1,250 XP", 
-                style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)
+                "${_formatNumber(xp)} XP", 
+                style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)
               ),
             ],
           ),
@@ -106,9 +117,8 @@ class HomeDashboardTab extends StatelessWidget {
     );
   }
 
-  // ... (Keep the rest of your methods: _buildBannerCard, _buildSearchBar, etc. exactly the same)
-  // Just make sure you are using the version I gave you previously that uses the Dark Theme colors.
-  
+  // --- (The rest of your code remains untouched) ---
+
   Widget _buildBannerCard(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -179,48 +189,15 @@ class HomeDashboardTab extends StatelessWidget {
   }
 
   Widget _buildSubjectsSection(BuildContext context) {
-    // IT Subjects as per requirements
     final subjects = [
-      {
-        "name": "Data Structures",
-        "icon": Icons.storage,
-        "color": Colors.pink,
-      },
-      {
-        "name": "Networking",
-        "icon": Icons.router,
-        "color": Colors.lightBlue,
-      },
-      {
-        "name": "Database Systems",
-        "icon": Icons.dns,
-        "color": Colors.purple,
-      },
-      {
-        "name": "Web Dev",
-        "icon": Icons.code,
-        "color": Colors.cyan,
-      },
-      {
-        "name": "HCI",
-        "icon": Icons.people,
-        "color": Colors.orange,
-      },
-      {
-        "name": "OS",
-        "icon": Icons.memory,
-        "color": Colors.green,
-      },
-      {
-        "name": "OOP",
-        "icon": Icons.view_module,
-        "color": Colors.yellow,
-      },
-      {
-        "name": "Capstone",
-        "icon": Icons.rocket_launch,
-        "color": Colors.deepPurple,
-      },
+      {"name": "Data Structures", "icon": Icons.storage, "color": Colors.pink},
+      {"name": "Networking", "icon": Icons.router, "color": Colors.lightBlue},
+      {"name": "Database Systems", "icon": Icons.dns, "color": Colors.purple},
+      {"name": "Web Dev", "icon": Icons.code, "color": Colors.cyan},
+      {"name": "HCI", "icon": Icons.people, "color": Colors.orange},
+      {"name": "OS", "icon": Icons.memory, "color": Colors.green},
+      {"name": "OOP", "icon": Icons.view_module, "color": Colors.yellow},
+      {"name": "Capstone", "icon": Icons.rocket_launch, "color": Colors.deepPurple},
     ];
 
     return Column(
@@ -245,7 +222,6 @@ class HomeDashboardTab extends StatelessWidget {
             final sub = subjects[index];
             return GestureDetector(
               onTap: () {
-                // Navigate to subject detail screen with subject name
                 Navigator.pushNamed(
                   context,
                   '/subjectDetail',
@@ -294,6 +270,18 @@ class HomeDashboardTab extends StatelessWidget {
         _buildActivityItem("Science Quiz", "28/30", Colors.green),
       ],
     );
+  }
+
+  String _formatNumber(int number) {
+    final numberStr = number.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < numberStr.length; i++) {
+      if (i > 0 && (numberStr.length - i) % 3 == 0) {
+        buffer.write(',');
+      }
+      buffer.write(numberStr[i]);
+    }
+    return buffer.toString();
   }
 
   Widget _buildActivityItem(String title, String score, Color color) {
