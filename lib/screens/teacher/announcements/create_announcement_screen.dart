@@ -1,5 +1,7 @@
 // lib/screens/teacher/announcements/create_announcement_screen.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../theme/app_theme.dart';
 
 class CreateAnnouncementScreen extends StatefulWidget {
@@ -31,16 +33,55 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
     super.dispose();
   }
 
-  void _publishAnnouncement() {
+  void _publishAnnouncement() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Save to Firebase
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Announcement published successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pop(context);
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User not authenticated')),
+          );
+          return;
+        }
+
+        // Get teacher name from Firestore
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        final teacherName = userDoc.data()?['name'] ?? 'Unknown Teacher';
+
+        // Save announcement to Firestore
+        await FirebaseFirestore.instance.collection('announcements').add({
+          'title': _titleController.text.trim(),
+          'content': _contentController.text.trim(),
+          'targetClass': _selectedClass,
+          'teacherName': teacherName,
+          'teacherEmail': currentUser.email,
+          'isUrgent': _isUrgent,
+          'timestamp': FieldValue.serverTimestamp(),
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Announcement published successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error publishing announcement: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 

@@ -1,6 +1,9 @@
 // lib/screens/student/login_page.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
+import '../../services/auth_service.dart';
 
 class StudentLoginPage extends StatefulWidget {
   const StudentLoginPage({super.key});
@@ -10,7 +13,65 @@ class StudentLoginPage extends StatefulWidget {
 }
 
 class _StudentLoginPageState extends State<StudentLoginPage> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _obscure = true;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+
+      if (mounted && userCredential.user != null) {
+        final authService = Provider.of<AuthService>(context, listen: false);
+        await authService.loadUserFromFirestore(userCredential.user!.uid);
+        Navigator.pushReplacementNamed(context, '/studentDashboard');
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        String errorMessage = 'Login failed';
+        if (e.code == 'user-not-found') {
+          errorMessage = 'No account found with this email';
+        } else if (e.code == 'wrong-password') {
+          errorMessage = 'Incorrect password';
+        } else if (e.code == 'invalid-email') {
+          errorMessage = 'Invalid email address';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,21 +122,26 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
             const SizedBox(height: 25),
 
             TextField(
-              style: const TextStyle(color: Colors.black), // Black text on white input
+              controller: _emailController,
+              enabled: !_isLoading,
+              style: const TextStyle(color: Colors.black),
               decoration: InputDecoration(
                 labelText: "Email",
                 labelStyle: const TextStyle(color: Colors.grey),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
             ),
 
             const SizedBox(height: 18),
 
             TextField(
+              controller: _passwordController,
+              enabled: !_isLoading,
               obscureText: _obscure,
-              style: const TextStyle(color: Colors.black), // Black text on white input
+              style: const TextStyle(color: Colors.black),
               decoration: InputDecoration(
                 labelText: "Password",
                 labelStyle: const TextStyle(color: Colors.grey),
@@ -86,14 +152,15 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
             ),
 
             const SizedBox(height: 30),
 
             _buildButton(
-              label: "Login",
-              onTap: () => Navigator.pushReplacementNamed(context, '/studentDashboard'),
+              label: _isLoading ? "Logging in..." : "Login",
+              onTap: _isLoading ? null : _handleLogin,
             ),
 
             const SizedBox(height: 16),
@@ -116,18 +183,17 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
     );
   }
 
-  Widget _buildButton({required String label, required VoidCallback onTap}) {
+  Widget _buildButton({required String label, required VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              AppTheme.primaryBlue, 
-              Color(0xFF8A4FFF) // Hardcoded violet to fix the missing property error
-            ], 
+          gradient: LinearGradient(
+            colors: onTap != null
+                ? const [AppTheme.primaryBlue, Color(0xFF8A4FFF)]
+                : [Colors.grey[600]!, Colors.grey[700]!],
           ),
           borderRadius: BorderRadius.circular(14),
         ),

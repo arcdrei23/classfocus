@@ -35,7 +35,7 @@ import 'package:trial/pages/student/badges_page.dart';
 import 'package:trial/pages/student/badge_details_page.dart';
 
 import 'package:trial/models/lesson_model.dart';
-import 'package:trial/models/leaderboard_entry.dart';
+import 'package:trial/models/leaderboard_entry.dart' as lb_entry;
 import 'package:trial/models/badge.dart' as badge_model;
 import 'package:trial/models/quiz_model.dart';
 
@@ -158,7 +158,7 @@ class AppRoutes {
       case '/studentProfile':
         final args = settings.arguments;
         // If arguments are provided (e.g. from Leaderboard), view that student
-        if (args is LeaderboardEntry) {
+        if (args is lb_entry.LeaderboardEntry) {
           page = StudentProfilePage(student: args);
         } 
         // If no arguments (e.g. from Dashboard Menu), view MY Profile Tab

@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/auth_service.dart';
 import '../students/students_list_screen.dart';
-import '../login/login_screen.dart';
 
 class TeacherDashboardPage extends StatefulWidget {
   const TeacherDashboardPage({super.key});
@@ -29,26 +28,6 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        title: const Text('Teacher Dashboard'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0.5,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (!mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
       body: IndexedStack(
         index: _currentIndex,
         children: _tabs,
@@ -85,46 +64,84 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
 }
 
 // Dashboard Home Tab Content
-class _DashboardHomeTab extends StatelessWidget {
+class _DashboardHomeTab extends StatefulWidget {
   const _DashboardHomeTab();
 
   @override
+  State<_DashboardHomeTab> createState() => _DashboardHomeTabState();
+}
+
+class _DashboardHomeTabState extends State<_DashboardHomeTab> {
+  late Future<List<Map<String, dynamic>>> _studentsFuture;
+  late Future<List<Map<String, dynamic>>> _quizzesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _studentsFuture = _fetchRecentStudents();
+    _quizzesFuture = _fetchQuizzesWithLeaderboard();
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchRecentStudents() async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'student')
+          .orderBy('createdAt', descending: true)
+          .limit(3)
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'name': data['name'] ?? 'Unknown',
+          'email': data['email'] ?? '',
+          'xp': data['xp'] ?? 0,
+        };
+      }).toList();
+    } catch (e) {
+      print('Error fetching students: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchQuizzesWithLeaderboard() async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('quizzes')
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        final leaderboardData = (data['leaderboardData'] as List? ?? [])
+            .map((e) => e as Map<String, dynamic>)
+            .toList();
+        
+        leaderboardData.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
+        return {
+          'id': doc.id,
+          'title': data['title'] ?? 'Untitled Quiz',
+          'accessCode': data['accessCode'] ?? '',
+          'leaderboard': leaderboardData.take(3).toList(),
+          'totalParticipants': leaderboardData.length,
+        };
+      }).toList();
+    } catch (e) {
+      print('Error fetching quizzes: $e');
+      return [];
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Demo data for students, classes, and quizzes
-    final students = [
-      {'name': 'Alex Cruz', 'id': 'STU-1023', 'progress': '92%', 'status': 'Active'},
-      {'name': 'Janine Reyes', 'id': 'STU-1044', 'progress': '88%', 'status': 'Active'},
-      {'name': 'Miguel Torres', 'id': 'STU-0991', 'progress': '74%', 'status': 'Needs help'},
-    ];
-
-    final classInfo = {
-      'name': 'Grade 6 - Einstein',
-      'subjects': 'Math, Science, English',
-      'students': '32 students',
-      'schedule': 'Mon-Fri • 8:00 AM - 3:00 PM',
-      'room': 'Room 204'
-    };
-
-    final quizzes = [
-      {
-        'title': 'Math Quiz 3',
-        'participants': ['Alex', 'Maria', 'John'],
-        'count': 18,
-        'status': 'Open'
-      },
-      {
-        'title': 'Science Quiz 1',
-        'participants': ['Janine', 'Kyle', 'Rina'],
-        'count': 22,
-        'status': 'Closed'
-      },
-    ];
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // --- Improved Teacher Header ---
             Container(
               padding: const EdgeInsets.all(20),
@@ -146,52 +163,25 @@ class _DashboardHomeTab extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Flexible(
-                    child: StreamBuilder<DocumentSnapshot>(
-                      stream: FirebaseAuth.instance.currentUser != null
-                          ? FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(FirebaseAuth.instance.currentUser!.uid)
-                              .snapshots()
-                          : null,
-                      builder: (context, snapshot) {
-                        String displayName = "Loading...";
-                        String roleText = "Teacher";
-                        
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          displayName = "Loading...";
-                        } else if (snapshot.hasData && snapshot.data!.exists) {
-                          final data = snapshot.data!.data() as Map<String, dynamic>?;
-                          final name = data?['name']?.toString();
-                          displayName = name != null && name.isNotEmpty 
-                              ? "Welcome back, $name"
-                              : "Welcome back, User";
-                          roleText = data?['role']?.toString() == 'teacher' 
-                              ? "Teacher" 
-                              : "User";
-                        } else {
-                          displayName = "Welcome back, User";
-                        }
-                        
+                  Expanded(
+                    child: Consumer<AuthService>(
+                      builder: (context, authService, _) {
+                        final userName = authService.currentUser?.name ?? 'Teacher';
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Flexible(
-                              child: Text(
-                                displayName,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                            Text(
+                              "Hello, $userName",
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Text(
-                              "$roleText • Grade 6 Head",
-                              style: const TextStyle(
+                            const Text(
+                              "Teacher Dashboard",
+                              style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 14,
                               ),
@@ -201,11 +191,21 @@ class _DashboardHomeTab extends StatelessWidget {
                       },
                     ),
                   ),
-                  const CircleAvatar(
+                  // --- FIX: SAFE IMAGE LOADING ---
+                  CircleAvatar(
                     radius: 32,
                     backgroundColor: Colors.white,
-                    backgroundImage: AssetImage('assets/images/logo.png'),
-                    child: Icon(Icons.person, color: AppTheme.primaryBlue),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.person, size: 32, color: AppTheme.primaryBlue);
+                        },
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -235,30 +235,26 @@ class _DashboardHomeTab extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Flexible(
+                  Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
                           "Manage Class Content",
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
+                        
                         const SizedBox(height: 8),
-                        Text(
+                        const Text(
                           "Create quizzes or post announcements.",
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white70,
                             fontSize: 14,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 20),
                         Row(
@@ -282,58 +278,96 @@ class _DashboardHomeTab extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // --- Statistics Cards ---
-            Row(
-              children: [
-                Flexible(
-                  child: _statCard(
-                    'Total Students',
-                    '127',
-                    Icons.people,
-                    Colors.blue,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: _statCard(
-                    'Active Quizzes',
-                    '8',
-                    Icons.quiz,
-                    Colors.green,
-                  ),
-                ),
-              ],
+            // --- Recent Students Section ---
+            const Text(
+              "Recent Students (Database)",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
-
-              const SizedBox(height: 24),
-              
-            Row(
-              children: [
-                Flexible(
-                  child: _statCard(
-                    'Announcements',
-                    '12',
-                    Icons.campaign,
-                    Colors.orange,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: _statCard(
-                    'Avg. Score',
-                    '85%',
-                    Icons.trending_up,
-                    Colors.purple,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 12),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _studentsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError || snapshot.data == null || snapshot.data!.isEmpty) {
+                  return const Text('No recent students');
+                }
+                return Column(
+                  children: snapshot.data!
+                      .map((student) => Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: AppTheme.primaryBlue.withOpacity(0.15),
+                                  child: Text(
+                                    (student['name'] as String).substring(0, 1).toUpperCase(),
+                                    style: const TextStyle(
+                                      color: AppTheme.primaryBlue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        student['name'] ?? '',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      Text(
+                                        student['email'] ?? '',
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  'XP: ${student['xp']}',
+                                  style: const TextStyle(
+                                    color: AppTheme.primaryBlue,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                );
+              },
             ),
 
             const SizedBox(height: 30),
 
-            // --- Class Details ---
+            // --- Quiz Leaderboard Section ---
             const Text(
-              "Class Details",
+              "Quiz Leaderboard",
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -341,102 +375,153 @@ class _DashboardHomeTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            _classDetailCard(classInfo),
-
-              const SizedBox(height: 24),
-              
-            // --- Students Details ---
-            const Text(
-              "Student Details",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _quizzesFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError || snapshot.data == null || snapshot.data!.isEmpty) {
+                  return const Text('No quizzes yet');
+                }
+                return Column(
+                  children: snapshot.data!
+                      .map((quiz) => Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      quiz['title'] ?? '',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryBlue.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        'Code: ${quiz['accessCode']}',
+                                        style: const TextStyle(
+                                          color: AppTheme.primaryBlue,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Top Scores:',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ...((quiz['leaderboard'] as List? ?? [])
+                                    .asMap()
+                                    .entries
+                                    .map((entry) {
+                                  final rank = entry.key + 1;
+                                  final student = entry.value as Map<String, dynamic>;
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 28,
+                                          height: 28,
+                                          decoration: BoxDecoration(
+                                            color: rank == 1
+                                                ? Colors.orange
+                                                : rank == 2
+                                                    ? Colors.grey
+                                                    : Colors.brown,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '#$rank',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            student['studentName'] ?? 'Unknown',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primaryBlue.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            '${student['score']}/${student['totalQuestions']}',
+                                            style: const TextStyle(
+                                              color: AppTheme.primaryBlue,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList()),
+                                if ((quiz['leaderboard'] as List? ?? []).isEmpty)
+                                  const Text(
+                                    'No submissions yet',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                );
+              },
             ),
-            const SizedBox(height: 12),
-            ...students.map((s) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _studentDetailTile(s),
-                )),
-
-              const SizedBox(height: 24),
-
-            // --- My Quizzes (with participants) ---
-            const Text(
-              "My Quizzes",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...quizzes.map((q) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _quizTile(context, q),
-                )),
-
-              const SizedBox(height: 24),
-
-            // --- My Classes Grid (Improved) ---
-            const Text(
-              "My Classes",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 16),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              childAspectRatio: 1.4,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            children: [
-                _classCard("Math 6", "32 Students", Colors.blue, Icons.calculate),
-                _classCard("Science 6", "30 Students", Colors.green, Icons.science),
-                _classCard("Advisory", "32 Students", Colors.orange, Icons.people),
-                _classCard("Club", "15 Members", Colors.purple, Icons.star),
-              ],
-            ),
-
-            const SizedBox(height: 30),
-
-            // --- Recent Submissions (Improved) ---
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Recent Submissions",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // Navigate to full submissions view
-                  },
-                  child: const Text(
-                    'View All',
-                    style: TextStyle(color: AppTheme.primaryBlue),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _submissionItem("Alex Cruz", "Math Quiz 3", "95%", true),
-            _submissionItem("Maria Reyes", "Science Quiz 1", "40%", false),
-            _submissionItem("John Doe", "English Quiz 2", "88%", true),
-          ],
+            const SizedBox(height: 32),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   Widget _actionBtn(BuildContext context, String label, IconData icon) {
@@ -507,8 +592,6 @@ class _DashboardHomeTab extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: color,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
@@ -517,8 +600,6 @@ class _DashboardHomeTab extends StatelessWidget {
               fontSize: 14,
               color: Colors.grey[600],
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -547,15 +628,11 @@ class _DashboardHomeTab extends StatelessWidget {
           children: [
               const Icon(Icons.class_, color: AppTheme.primaryBlue),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  info['name'] ?? '',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                info['name'] ?? '',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -584,10 +661,8 @@ class _DashboardHomeTab extends StatelessWidget {
                 color: Colors.grey[800],
                 fontSize: 14,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+                    ),
+                  ),
                 ],
       ),
     );
@@ -599,7 +674,7 @@ class _DashboardHomeTab extends StatelessWidget {
         status.toLowerCase().contains('need') ? Colors.orange : Colors.green;
     return Container(
       padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -633,8 +708,6 @@ class _DashboardHomeTab extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   student['id'] ?? '',
@@ -642,8 +715,6 @@ class _DashboardHomeTab extends StatelessWidget {
                     color: Colors.grey,
                     fontSize: 12,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -657,8 +728,6 @@ class _DashboardHomeTab extends StatelessWidget {
                   color: Colors.black,
                   fontWeight: FontWeight.bold,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 status,
@@ -666,11 +735,9 @@ class _DashboardHomeTab extends StatelessWidget {
                   color: statusColor,
                   fontSize: 12,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-          ],
-        ),
+            ],
+          ),
         ],
       ),
     );
@@ -697,15 +764,11 @@ class _DashboardHomeTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  quiz['title'] as String? ?? '',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                quiz['title'] as String? ?? '',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
                 ),
               ),
               Container(
@@ -714,15 +777,13 @@ class _DashboardHomeTab extends StatelessWidget {
                   color: AppTheme.primaryBlue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child:                 Text(
+                child: Text(
                   "${quiz['count'] ?? 0} joined",
                   style: const TextStyle(
                     color: AppTheme.primaryBlue,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -747,8 +808,6 @@ class _DashboardHomeTab extends StatelessWidget {
               color: Colors.grey,
               fontSize: 12,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           Align(
@@ -806,8 +865,8 @@ class _DashboardHomeTab extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
         Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -833,8 +892,6 @@ class _DashboardHomeTab extends StatelessWidget {
                   fontSize: 16,
                   color: Colors.black87,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Text(
@@ -906,10 +963,8 @@ class _DashboardHomeTab extends StatelessWidget {
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-              color: isPassing
-                  ? Colors.green.withOpacity(0.1)
-                  : Colors.red.withOpacity(0.1),
+            decoration: BoxDecoration(
+              color: isPassing ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -919,15 +974,12 @@ class _DashboardHomeTab extends StatelessWidget {
                 fontSize: 15,
                 color: isPassing ? Colors.green : Colors.red,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-              ),
+          ),
         ],
       ),
     );
   }
-}
 
 // Reports Tab - Weekly Report UI
 class _ReportsTab extends StatelessWidget {
@@ -1046,8 +1098,6 @@ class _ReportsTab extends StatelessWidget {
             fontWeight: FontWeight.bold,
             color: color,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
         Text(
@@ -1056,8 +1106,6 @@ class _ReportsTab extends StatelessWidget {
             fontSize: 14,
             color: Colors.grey[600],
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -1111,8 +1159,6 @@ class _ReportsTab extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -1183,7 +1229,6 @@ class _SettingsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
-      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text(
           "Settings",
@@ -1194,76 +1239,61 @@ class _SettingsTab extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(0),
         child: Column(
           children: [
-            // Profile Section with Firestore
+            // Profile Section
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(20),
-              child: StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseAuth.instance.currentUser != null
-                    ? FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(FirebaseAuth.instance.currentUser!.uid)
-                        .snapshots()
-                    : null,
-                builder: (context, snapshot) {
-                  String displayName = "Welcome back, ...";
-                  String roleText = "Teacher";
-                  
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    displayName = "Welcome back, ...";
-                  } else if (snapshot.hasData && snapshot.data!.exists) {
-                    final data = snapshot.data!.data() as Map<String, dynamic>?;
-                    displayName = data?['name']?.toString() ?? "User";
-                    roleText = data?['role']?.toString() == 'teacher' 
-                        ? "Teacher" 
-                        : "User";
-                  } else {
-                    displayName = "User";
-                  }
-                  
-                  return Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 32,
-                        backgroundImage: AssetImage('assets/images/logo.png'),
-                        backgroundColor: Colors.grey,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayName,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "$roleText • Grade 6 Head",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/teacherEditProfile');
+              child: Row(
+                children: [
+                  // --- FIX: SAFE IMAGE LOADING ---
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundColor: Colors.grey,
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.person, size: 40, color: Colors.white);
                         },
-                        icon: const Icon(Icons.edit, color: AppTheme.primaryBlue),
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Mr. Anderson",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                const SizedBox(height: 4),
+                        Text(
+                          "Teacher • Grade 6 Head",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+              ],
+            ),
+          ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/teacherEditProfile');
+                    },
+                    icon: const Icon(Icons.edit, color: AppTheme.primaryBlue),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 8),
@@ -1463,7 +1493,7 @@ class _SettingsTab extends StatelessWidget {
               child: Consumer<AuthService>(
                 builder: (context, authService, child) {
                   return ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       showDialog(
                         context: context,
                         builder: (context) => AlertDialog(
@@ -1475,13 +1505,14 @@ class _SettingsTab extends StatelessWidget {
                               child: const Text("Cancel"),
                             ),
                             TextButton(
-                              onPressed: () {
+                              onPressed: () async {
+                                // 1. Sign out of Firebase
+                                await FirebaseAuth.instance.signOut();
+                                // 2. Clear local provider state
                                 authService.logout();
-                                Navigator.pushNamedAndRemoveUntil(
-                                  context,
-                                  '/loginSelection',
-                                  (route) => false,
-                                );
+                                // 3. Close dialog
+                                Navigator.pop(context);
+                                // The StreamBuilder in main.dart will automatically handle navigation
                               },
                               child: const Text(
                                 "Logout",

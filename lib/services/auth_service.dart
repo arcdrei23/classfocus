@@ -8,6 +8,9 @@ import '../constants.dart';
 class AuthService extends ChangeNotifier {
   UserModel? _currentUser;
   
+  // Track if we've loaded user data from Firestore
+  bool _isLoadingUserData = false;
+
   // Mock users database (for backward compatibility)
   final List<UserModel> _mockUsers = [
     UserModel(
@@ -137,6 +140,45 @@ class AuthService extends ChangeNotifier {
     _currentUser = user;
     notifyListeners();
     return true;
+  }
+
+  /// Fetch and load user data from Firestore based on Firebase Auth UID
+  Future<void> loadUserFromFirestore(String uid) async {
+    if (_isLoadingUserData) return;
+    
+    try {
+      _isLoadingUserData = true;
+      
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data();
+        
+        // Create a UserModel from Firestore data
+        _currentUser = UserModel(
+          id: uid,
+          name: data?['name'] ?? 'Unknown User',
+          email: data?['email'] ?? '',
+          studentId: data?['studentId'] ?? 'N/A',
+          xp: data?['xp'] ?? 0,
+          streak: data?['streak'] ?? 0,
+          profileImageUrl: data?['profileImageUrl'] ?? 'https://i.pravatar.cc/300',
+          recentActivities: [],
+        );
+        
+        notifyListeners();
+        print('[AuthService] User loaded from Firestore: ${_currentUser?.name}');
+      } else {
+        print('[AuthService] User document not found in Firestore');
+      }
+    } catch (e) {
+      print('[AuthService] Error loading user from Firestore: $e');
+    } finally {
+      _isLoadingUserData = false;
+    }
   }
 
   void logout() {

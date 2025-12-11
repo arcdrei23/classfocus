@@ -4,26 +4,33 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+// Imports from your project structure
 import 'routes.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/quiz_provider.dart';
+import 'services/dev_data_service.dart';
+import 'firebase_options.dart'; // Ensure you have run 'flutterfire configure'
+
+// Screen Imports
 import 'screens/teacher/dashboard/teacher_dashboard.dart';
 import 'screens/student/dashboard/student_dashboard.dart';
-import 'screens/teacher/login/login_screen.dart';
-import 'firebase_options.dart';
+import 'screens/auth/login_selection_page.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase with generated options
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await FirebaseAuth.instance.signOut();
+    
+    // Initialize dev data (student + teacher accounts + sample quizzes)
+    await DevDataService.initializeDevData();
   } catch (e) {
     print('Firebase initialization error: $e');
-    // App will still run, but Firebase features won't work
   }
   
   runApp(const ClassFocusApp());
@@ -42,30 +49,27 @@ class ClassFocusApp extends StatelessWidget {
       child: MaterialApp(
         title: 'ClassFocus',
         debugShowCheckedModeBanner: false,
-
-        // 1. Theme Configuration
         theme: AppTheme.darkTheme,
-
-        // 2. Navigation Routes
-        // This connects to your routes.dart file to handle all page navigation
         onGenerateRoute: AppRoutes.generateRoute,
 
-        // 3. Starting Screen with Firebase auth persistence and role-based routing
+        // Persistent Login Logic
         home: StreamBuilder<User?>(
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {
+            // 1. Loading state
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               );
             }
 
+            // 2. User is logged in
             if (snapshot.hasData) {
-              // User is logged in - fetch role and show appropriate dashboard
               return _RoleBasedDashboard(user: snapshot.data!);
             }
 
-            return const LoginScreen();
+            // 3. User is NOT logged in (Go to selection page)
+            return const LoginSelectionPage();
           },
         ),
       ),
@@ -73,28 +77,40 @@ class ClassFocusApp extends StatelessWidget {
   }
 }
 
-// Widget to handle role-based dashboard routing
-class _RoleBasedDashboard extends StatelessWidget {
+class _RoleBasedDashboard extends StatefulWidget {
   final User user;
 
   const _RoleBasedDashboard({required this.user});
+
+  @override
+  State<_RoleBasedDashboard> createState() => _RoleBasedDashboardState();
+}
+
+class _RoleBasedDashboardState extends State<_RoleBasedDashboard> {
+  @override
+  void initState() {
+    super.initState();
+    // Load user data from Firestore
+    Future.microtask(() {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      authService.loadUserFromFirestore(widget.user.uid);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
-          .doc(user.uid)
+          .doc(widget.user.uid)
           .snapshots(),
       builder: (context, snapshot) {
-        // Show loading while fetching user role
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // If user document exists, check role
         if (snapshot.hasData && snapshot.data!.exists) {
           final userData = snapshot.data!.data() as Map<String, dynamic>?;
           final role = userData?['role'] as String? ?? 'student';
@@ -106,7 +122,7 @@ class _RoleBasedDashboard extends StatelessWidget {
           }
         }
 
-        // Default to student dashboard if role not found
+        // Default fallback
         return const StudentDashboard();
       },
     );

@@ -1,6 +1,9 @@
 // lib/screens/auth/register_page.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../theme/app_theme.dart';
+import '../../services/auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -28,13 +31,46 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  void _handleRegister() {
+  void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
-      // Navigate to appropriate dashboard based on role
-      if (_selectedRole == 'student') {
-        Navigator.pushReplacementNamed(context, '/studentDashboard');
-      } else {
-        Navigator.pushReplacementNamed(context, '/teacherDashboard');
+      if (_passwordController.text != _confirmPasswordController.text) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Passwords do not match')),
+        );
+        return;
+      }
+
+      try {
+        final authService = Provider.of<AuthService>(context, listen: false);
+        
+        // Call the signUp method from AuthService
+        await authService.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          name: _nameController.text.trim(),
+          role: _selectedRole,
+        );
+
+        if (mounted) {
+          // Navigate to appropriate dashboard based on role
+          if (_selectedRole == 'student') {
+            Navigator.pushReplacementNamed(context, '/studentDashboard');
+          } else {
+            Navigator.pushReplacementNamed(context, '/teacherDashboard');
+          }
+        }
+      } on FirebaseAuthException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.message}')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Registration failed: $e')),
+          );
+        }
       }
     }
   }

@@ -81,6 +81,8 @@ class _QuizCreatorScreenState extends State<QuizCreatorScreen> {
       }
 
       final quizId = DateTime.now().millisecondsSinceEpoch.toString();
+      final currentUser = FirebaseAuth.instance.currentUser;
+      
       final quiz = QuizModel(
         id: quizId,
         title: _titleController.text,
@@ -88,32 +90,21 @@ class _QuizCreatorScreenState extends State<QuizCreatorScreen> {
         questions: _questions,
         isPublished: _isPublished,
         durationMinutes: int.tryParse(_durationController.text) ?? 7,
+        accessCode: _accessCode,
+        createdBy: currentUser?.email ?? '',
+        studentParticipants: [],
+        leaderboardData: [],
       );
 
       final quizProvider = Provider.of<QuizProvider>(context, listen: false);
       quizProvider.addQuiz(quiz);
 
-      // Save to Firestore with access code
+      // Save to Firestore using the toMap() method
       try {
         await FirebaseFirestore.instance
             .collection('quizzes')
             .doc(quizId)
-            .set({
-          'id': quizId,
-          'title': _titleController.text,
-          'subject': _selectedSubject,
-          'questions': _questions.map((q) => {
-            'id': q.id,
-            'questionText': q.questionText,
-            'options': q.options,
-            'correctAnswerIndex': q.correctAnswerIndex,
-          }).toList(),
-          'isPublished': _isPublished,
-          'durationMinutes': int.tryParse(_durationController.text) ?? 7,
-          'accessCode': _accessCode,
-          'createdAt': FieldValue.serverTimestamp(),
-          'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
-        });
+            .set(quiz.toMap());
 
         // Show access code dialog
         if (mounted) {
